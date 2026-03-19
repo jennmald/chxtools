@@ -45,25 +45,25 @@ def get_Lambda(E, u="SI"):
     Qelectron = 1.602176463e-19
     scale = 1
     # l=hPlank*cvac/(E*1000*Qelectron)
-    l = hPlank * cvac / (E * 1000 * Qelectron)
+    wavelength = hPlank * cvac / (E * 1000 * Qelectron)
     if u == "A":
         scale = 1e10
-        return l * scale  # Angstroem
+        return wavelength * scale  # Angstroem
     elif u == "nm":
         scale = 1e9
-        return l * scale  # nm
+        return wavelength * scale  # nm
     elif u == "um":
         scale = 1e6
-        return l * scale  # um
+        return wavelength * scale  # um
     elif u == "mm":
         scale = 1e3
-        return l * scale  # mm
+        return wavelength * scale  # mm
     elif u == "cm":
         scale = 1e2
-        return l * scale  # cm
+        return wavelength * scale  # cm
     elif u == "m" or u == "SI":
         scale = 1
-        return l * scale
+        return wavelength * scale
     else:
         print(
             "invalid option, type \"get_Lambda('?')\" for available options and syntax"
@@ -222,7 +222,7 @@ def get_mu(material, E=8):
         )
 
 
-def get_T(material, E=8, l=1):
+def get_T(material, E=8, thickness=1):
     """
     by LW 10/03/2010,
     function calculates the transmission as a function of the material and the X-ray energy according to e^(-mul),
@@ -241,9 +241,9 @@ def get_T(material, E=8, l=1):
             name.append(m.group(0))
 
     E = np.array(E)
-    l = np.array(l)
-    # if len(E)==1 or len(l)==1:
-    if E.size == 1 or l.size == 1:
+    thickness = np.array(thickness)
+    # if len(E)==1 or len(thickness)==1:
+    if E.size == 1 or thickness.size == 1:
         if material in name:
             loadn = Path(datapath) / Path("n_{}.dat".format(material))
             n = pl.loadtxt(loadn, comments="%")
@@ -252,7 +252,7 @@ def get_T(material, E=8, l=1):
             ):
                 b = np.interp(E * 1000, n[:, 0], n[:, 2])
                 mu = 4 * np.pi / get_Lambda(E, "um") * b
-                return np.exp(-mu * l)
+                return np.exp(-mu * thickness)
             else:
                 print(
                     "error: energy "
@@ -382,11 +382,11 @@ def get_Bragg(reflection, E=8.0):
             )
             theta = np.degrees(np.arcsin(lam / 2 / dspace[ind]))
             ds = []
-            I = []
-            for l in range(0, np.size(theta)):
+            I_list = []
+            for _ in range(0, np.size(theta)):
                 ds.append(dspace[ind])
-                I.append(Irel[ind])
-            res = np.array([np.array([theta]), np.array(ds), np.array(I)])[0]
+                I_list.append(Irel[ind])
+            res = np.array([np.array([theta]), np.array(ds), np.array(I_list)])[0]
             return res.T
         elif reflection == "reflections?":
             print("List of available reflections (T=25C):")
@@ -502,10 +502,10 @@ def get_EBragg(reflection, theta_Bragg=12.0, d_spacing=None):
                 ind = reflstr.index(reflection)
                 # print reflstr[ind] +': d_{hkl}=' + "%3.4f" %dspace[ind] +'A   I/I_o='+ "%3.4f" %Irel[ind]
                 ds = []
-                I = []
-                for l in range(0, np.size(theta_Bragg)):
+                I_list = []
+                for _ in range(0, np.size(theta_Bragg)):
                     ds.append(dspace[ind])
-                    I.append(Irel[ind])
+                    I_list.append(Irel[ind])
             else:
                 # ds = [d_spacing] * len(theta_Bragg) #will raise error if theta_Bragg is a scalar
                 ds = [d_spacing] * np.size(theta_Bragg)
@@ -727,9 +727,9 @@ def get_Es(gap, harmonic=[1, 2, 3, 4, 5], ID=default_id):
         )
         print(name)
     else:
-        for l in range(0, np.size(harmonic)):
+        for idx in range(0, np.size(harmonic)):
             harm_check(harmonic)
-            if l == np.size(harmonic) - 1:
+            if idx == np.size(harmonic) - 1:
                 gap = np.array(gap)
                 if ID in name:
                     loadn = Path(datapath) / Path("id_{}.dat".format(ID))
@@ -835,20 +835,16 @@ def harm_check(harm_n):
     """
     state = True
 
-    if np.all(np.array(harm_n) >= 1) != True:
+    if not np.all(np.array(harm_n) >= 1):
         raise xfuncs_Exception("Type Error: Harmonic numbers need to be >=1!")
 
     try:
-        list(harm_n)  # b is the list to be checked
-        for i in list(harm_n):
-            # print isinstance(i,int)
-            state = state * isinstance(i, int)
-    except:  # check for b being a single integer
-        try:
-            state = state * isinstance(harm_n, int)
-            # print isinstance(harm_n, int)
-        except:
-            pass
+        for i in harm_n:
+            # Check all values when an iterable is provided.
+            state = state and isinstance(i, int)
+    except TypeError:
+        # Scalar input is valid if it is a single integer.
+        state = state and isinstance(harm_n, int)
 
-    if state != True:
+    if not state:
         raise xfuncs_Exception("Type Error: Harmonic numbers need to be integers >=1!")
