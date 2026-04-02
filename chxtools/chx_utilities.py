@@ -54,18 +54,18 @@ def E_calibration(file, Edge="Cu", xtal="Si111cryo", B_off=0):
         for row in filereader:  # read data
             try:
                 Bragg.append(float(row[2]))
-            except:
+            except Exception:
                 print("could not convert: ", row[2])
             try:
                 Gap.append(float(row[5]))
-            except:
+            except Exception:
                 print("could not convert: ", row[5])
             try:
                 Intensity.append(float(row[7]))
-            except:
+            except Exception:
                 print("could not convert: ", row[8])
     B = np.array(Bragg) * -1.0 + B_off
-    G = np.array(Gap[0 : len(B)])  # not currently used, but converted for future use
+    # G = np.array(Gap[0 : len(B)])  # not currently used, but converted for future use
     Int = np.array(Intensity[0 : len(B)])
 
     # normalize and remove background:
@@ -200,10 +200,12 @@ def dcm_roll(Bragg, offset, distance, offmode="mm", pixsize=5.0):
             )
 
     # data fitting
-    fitfunc = lambda p, x: (
-        p[0] + 2 * d * p[1] * np.sin(x / 180.0 * np.pi)
-    )  # Target function
-    errfunc = lambda p, x, y: fitfunc(p, Bragg) - y  # Distance to the target function
+    def fitfunc(p, x):  # Target function
+        return p[0] + 2 * d * p[1] * np.sin(x / 180.0 * np.pi)
+
+    def errfunc(p, x, y):  # Distance to the target function
+        return fitfunc(p, Bragg) - y
+
     p0 = [np.mean(offset), -0.5]  # Initial guess for the parameters
     p1, success = optimize.leastsq(errfunc, p0[:], args=(Bragg, offset))
 
@@ -245,7 +247,7 @@ def sum_image(filename, firstim=0, lastim=9999):
     # extract filename and first image number:
     a = file_path.split("/")
     fn = a[len(a) - 1].split(".")[0]  # file name
-    b = fn.split(".")
+    # b = fn.split(".")
     # fe=b[len(b)-1]  # file ending, e.g .tiff
     fe = a[len(a) - 1].split(".")[1]
     c = fn.split("_")
@@ -383,7 +385,7 @@ def show_cut(img, cut=1000, direction="horz", width=10, title=None):
             :,
             cut - width / 2 : cut + width / 2,
         ] = 0
-    if title == None:
+    if title is None:
         title = "Img-&-Cut_%s" % cut
 
     show_img(img_, title=title)
@@ -422,9 +424,9 @@ def show_img(
 
     if ax is None:
         fig, ax = plt.subplots(nrows=1)
-    if vmin == None:
+    if vmin is None:
         vmin = img.min()
-    if vmax == None:
+    if vmax is None:
         vmax = img.max()
     shape = img.shape
     dy, dx = shape
@@ -435,23 +437,23 @@ def show_img(
         x1, x2, y1, y2 = extent
         if ylim is None:
             ylim = [y2, y1]
-        aspect_ = determine_aspect(shape, extent)
-    else:
-        aspect_ = None
+    #     aspect_ = determine_aspect(shape, extent)
+    # else:
+    #     aspect_ = None
     if ylim is None:
         ylim = [0, dy]
     ax.set_ylim([ylim[0], ylim[1]])
-    if not logs:
-        cax = ax.imshow(
-            img, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_, extent=extent
-        )  # ,interpolation='none')
+    # if not logs:
+    # cax = ax.imshow(
+    #     img, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_, extent=extent
+    # )  # ,interpolation='none')
     if logs:
         img = np.log(img)
-        if vmin == None:
-            vmin = img[nonzero(img)].min()  # img.min()
-        cax = ax.imshow(
-            img, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_, extent=extent
-        )  # ,interpolation='none')
+        if vmin is not None:
+            vmin = img[np.nonzero(img)].min()  # img.min()
+        # cax = ax.imshow(
+        #     img, cmap=cmap, vmin=vmin, vmax=vmax, aspect=aspect_, extent=extent
+        # )  # ,interpolation='none')
     if aspect is not None:
         im = ax.get_images()
         x1, x2, y1, y2 = im[0].get_extent()
@@ -485,11 +487,11 @@ def show_img(
         plt.step(ax.get_yticklabels(), fontsize=fontsize * 0.8, visible=True)  #
     else:
         plt.yticks(yticks, fontsize=fontsize * 0.8)
-    if ax is None:
-        cbar = fig.colorbar(cax, ticks=[vmin, vmax])
+    # if ax is None:
+    #     cbar = fig.colorbar(cax, ticks=[vmin, vmax])
 
     if save:
-        if outDir != None:
+        if outDir is not None:
             fp = outDir + title + "_.png"
         else:
             fp = title + "_.png"
@@ -581,8 +583,6 @@ def plot_pv_values(
             ymean = d[keys[i]].mean()
             ymax, ymin = d[keys[i]].max(), d[keys[i]].min()
             width = min([ymax - ymean, ymean - ymin])
-            ymax_ = ymean + width
-            ymin_ = ymean - width
             ylim = [ymean - width * 5, ymean + width * 5]
         else:
             ylim = ylim_tv[i]
@@ -608,8 +608,7 @@ def plot_pv_values(
                 x.set_visible(False)
 
     if img is not None:
-        dy, dx = img.shape
-        shape = img.shape
+        dy, _ = img.shape
         extent = [np.min(time), np.max(time), dy * pixsize, 0]
         show_img(
             img,
@@ -808,8 +807,8 @@ def read_scan(sid, fill=True):
     from dataportal import DataMuxer as dm
     import datetime
 
-    hdr = db[sid]
-    ev = db.fetch_events(hdr, fill=fill)  # , fill=True)
+    hdr = db[sid]  # noqa: F821
+    ev = db.fetch_events(hdr, fill=fill)  # , fill=True) # noqa: F821
     muxer = dm.from_events(ev)
     data = muxer.to_sparse_dataframe()
     dt = data.time
@@ -835,7 +834,6 @@ def get_waterfall(
 
     import numpy as np
 
-    imcount = firstim
     waterfall = {}
     notime = lastim + 1 - firstim
     in_time = data.time
@@ -867,7 +865,6 @@ def get_img_waterfall(
 
     import numpy as np
 
-    imcount = firstim
     waterfall = {}
     notime = lastim + 1 - firstim
     for n in range(0, notime):
@@ -924,7 +921,7 @@ def line_focus(
         # extract filename and first image number:
         a = file_path.split("/")
         fn = a[len(a) - 1].split(".")[0]  # file name
-        b = fn.split(".")
+        _ = fn.split(".")
         # fe=b[len(b)-1]  # file ending, e.g .tiff
         fe = a[len(a) - 1].split(".")[1]
         c = fn.split("_")
@@ -1005,7 +1002,6 @@ def line_focus(
                     cdat = dat[i, :]
                 elif direction == "vert":
                     cdat = dat[:, i]
-                    # print cdat;
                 else:
                     raise CHX_utilities_Exception(
                         'error: cut direction must be either "horz" or "vert".'
@@ -1018,7 +1014,7 @@ def line_focus(
                 p0 = [yo, A, xc, w]
                 try:
                     coeff, var_matrix = curve_fit(
-                        gauss, np.array(xrange(len(cdat))), cdat, p0=p0
+                        gauss, np.array(list(range(len(cdat)))), cdat, p0=p0
                     )
                 except Exception:
                     coeff = [0, 0, 0, 0]
@@ -1043,7 +1039,7 @@ def line_focus(
 
             try:
                 dat = np.sum(im, axis=2)  # sum RGB channels for a color image
-            except:
+            except Exception:
                 dat = im
 
             for i in cuts:
@@ -1064,9 +1060,9 @@ def line_focus(
                 p0 = [yo, A, xc, w]
                 try:
                     coeff, var_matrix = curve_fit(
-                        gauss, np.array(xrange(len(cdat))), cdat, p0=p0
+                        gauss, np.array(list(range(len(cdat)))), cdat, p0=p0
                     )
-                except:
+                except Exception:
                     coeff = [0, 0, 0, 0]
                 baseline.append(coeff[0])
                 amp.append(coeff[1])
@@ -1087,7 +1083,7 @@ def line_focus(
             im = imgs[:, t]
             try:
                 dat = np.sum(im, axis=2)  # sum RGB channels for a color image
-            except:
+            except Exception:
                 dat = im
 
             for i in cuts:
@@ -1102,9 +1098,9 @@ def line_focus(
                 p0 = [yo, A, xc, w]
                 try:
                     coeff, var_matrix = curve_fit(
-                        gauss, np.array(xrange(len(cdat))), cdat, p0=p0
+                        gauss, np.array(list(range(len(cdat)))), cdat, p0=p0
                     )
-                except:
+                except Exception:
                     coeff = [0, 0, 0, 0]
                 baseline.append(coeff[0])
                 amp.append(coeff[1])
@@ -1144,18 +1140,18 @@ def show_focus_line_fit(waterfall, para, lists=None, title=None):
     if lists is None:
         lists = []
         lists.append([t / 5, 2 * t / 5, 3 * t / 5, 4 * t / 5])
-    fig, ax = plt.subplots(len(lists[0]))
-    for i, l in enumerate(lists[0]):
-        im = waterfall[:, l]
+    _, ax = plt.subplots(len(lists[0]))
+    for i, val in enumerate(lists[0]):
+        im = waterfall[:, val]
         p = para[i : i + 1].values[0]
-        show_fit([range(L), im], p, ax=ax[i], title=title + "_time@_%s" % l)
+        show_fit([range(L), im], p, ax=ax[i], title=title + "_time@_%s" % val)
 
 
 def test_fft():
     import matplotlib.pyplot as plt
     import numpy as np
 
-    fig, ax = plt.subplots(2)
+    _, ax = plt.subplots(2)
     t = np.linspace(0, 20, 1000)
     y = (
         0.5 * np.sin(2 * np.pi * 5 * t)
@@ -1175,11 +1171,11 @@ def get_fft(t, y):
     import numpy as np
 
     L = len(t)
-    tp = np.array(t)
-    yp = np.array(y)
+    _ = np.array(t)
+    _ = np.array(y)
     dx = (t[L - 1] - t[0]) / float(L)
     tm = 2 * L * dx
-    xs = 1 / tm
+    _ = 1 / tm
 
     y = np.concatenate((y, np.zeros(L)))
 
@@ -1214,7 +1210,7 @@ def plot_line_focus2(
     td = times_
     tf = trans_td_to_tf(td)
 
-    if title == None:
+    if title is None:
         title = "LF_"
     fig, axs = ptg._subplots(M, sharex=True, sharey=False, layout=[M, 1])
     axs[0].set_title(title)
@@ -1241,7 +1237,7 @@ def plot_line_focus2(
         label=str(cuts[0]),
     )
 
-    x = xrange(N)
+    x = list(range(N))
     y = yc
     pol = np.polyfit(x, y, 20)  # 20)
     polfit = np.polyval(pol, x)
@@ -1351,7 +1347,7 @@ def plot_line_focus(res, cuts, pix=1, epochtime="false", times=None):
     epoch = []
     plt.close()
     if times is None:
-        for i in xrange(len(res[4][:])):
+        for i in list(range(len(res[4][:]))):
             dt = parser.parse(res[4][i])
             epoch.append(dt.strftime("%s"))
     else:
@@ -1359,11 +1355,11 @@ def plot_line_focus(res, cuts, pix=1, epochtime="false", times=None):
 
     epoch = np.array(epoch)
     plt.figure(1)  #### plot and analyze center position
-    for i in xrange(len(cuts)):
+    for i in list(range(len(cuts))):
         y = center[i :: len(cuts)]
         # print y
         if epochtime == "false":
-            x = xrange(len(y))
+            x = list(range(len(y)))
             x_str = "image #"
         else:
             x = epoch
@@ -1376,15 +1372,13 @@ def plot_line_focus(res, cuts, pix=1, epochtime="false", times=None):
 
     plt.figure(5)
     plt.figure(6)  ##### plot and analyze center short time vibrations
-    for i in xrange(len(cuts)):
+    for i in list(range(len(cuts))):
         y = np.array(center[i :: len(cuts)])
-        # print y
         if epochtime == "false":
-            x = xrange(len(y))
+            x = list(range(len(y)))
             x_str = "image #"
         else:
-            # x=epoch
-            x = xrange(len(y))
+            x = list(range(len(y)))
             x_str = "epoch [s]"
 
     pol = np.polyfit(x, y, 20)
@@ -1433,9 +1427,8 @@ def plot_line_focus(res, cuts, pix=1, epochtime="false", times=None):
     plt.figure(6)  #### plot and analyze long time drifts
 
     plt.figure(2)  ############ plot and analyze fwhm
-    for i in xrange(len(cuts)):
+    for i in list(range(len(cuts))):
         y = width[i :: len(cuts)]
-        # print y
         y = 2.35 * y * pix
         plt.plot(x, y, "+", label=str(cuts[i]))
         print(
@@ -1454,10 +1447,8 @@ def plot_line_focus(res, cuts, pix=1, epochtime="false", times=None):
     plt.xlabel(x_str)
 
     plt.figure(3)
-    for i in xrange(len(cuts)):
+    for i in list(range(len(cuts))):
         y = amp[i :: len(cuts)]
-        # print y
-        # x=xrange(len(y))
         plt.plot(x, y, "+", label=str(cuts[i]))
     plt.legend(loc="best")
     plt.title("Amplitude")
@@ -1465,10 +1456,8 @@ def plot_line_focus(res, cuts, pix=1, epochtime="false", times=None):
     plt.xlabel(x_str)
 
     plt.figure(4)
-    for i in xrange(len(cuts)):
+    for i in list(range(len(cuts))):
         y = base[i :: len(cuts)]
-        # print y
-        # x=xrange(len(y))
         plt.plot(x, y, "+", label=str(cuts[i]))
     plt.legend(loc="best")
     plt.title("Baseline")
@@ -1491,18 +1480,13 @@ def read_camonitor(filename, epoch="true"):
     print("loading camonitor data from: ", file_path)
     with open(file_path, "r") as cafile:
         cadata = cafile.readlines()
-    # datime=[]
-    # datdate=[]
     value_camon = []
     epoch_camon = []
-    for i in xrange(len(cadata)):
+    for i in list(range(len(cadata))):
         line = cadata[i].split()
         value_camon.append(float(line[len(line) - 1]))
         datdate = line[len(line) - 3]
         datime = line[len(line) - 2]
-        # print datdate.split()[0]
-        # print datime
-        # print int(datdate.split('-')[0]),int(datdate.split('-')[1]),int(datdate.split('-')[2]),int(datime.split(':')[0]),int(datime.split(':')[1]),int(datime.split(':')[2].split('.')[0]),int(datime.split(':')[2].split('.')[1])
         epoch_camon.append(
             float(
                 datetime.datetime(
@@ -1543,7 +1527,7 @@ def knife_edge(filename, direction="horz", cuts=[1, 2, 3], firstim=0, lastim=1, 
     # extract filename and first image number:
     a = file_path.split("/")
     fn = a[len(a) - 1].split(".")[0]  # file name
-    b = fn.split(".")
+    # b = fn.split(".")
     # fe=b[len(b)-1]  # file ending, e.g .tiff
     fe = a[len(a) - 1].split(".")[1]
     c = fn.split("_")
@@ -1633,35 +1617,24 @@ def knife_edge(filename, direction="horz", cuts=[1, 2, 3], firstim=0, lastim=1, 
             if i >= 100:
                 bp[i] = 0
         cdat = sp.ifft(bp)
-        ###### try with normalization
-        # devdat=np.diff(cdat/max(cdat))
-        #######
         devdat = np.diff(cdat)
         ##########
         if imcount == firstim:
             plt.close(9)
             plt.figure(9)
-            plt.plot(xrange(len(devdat)), devdat / max(devdat) * max(cdat))
-            plt.plot(xrange(len(cdat)), cdat)
+            plt.plot(list(range(len(devdat))), devdat / max(devdat) * max(cdat))
+            plt.plot(list(range(len(cdat))), cdat)
 
-    # print devdat
-    # np.argmax(devdat)
-    # center.append(np.argmax(devdat))
     #### try helping with using the correct maximum (allows to use more Fourier components)
     center.append(np.argmax(devdat[900:1500]))
     ####
     imcount = imcount + 1
-    # plotting section:
-    # plt.figure(3)
-    # plt.plot(xrange(len(devdat)),devdat)
-    # plt.figure(2)
-    # plt.plot(xrange(len(cdat)),cdat,'o-')
     plt.close(51)
     plt.figure(51)
-    for i in xrange(len(cuts)):
+    for i in list(range(len(cuts))):
         y = center[i :: len(cuts)]
         # print y
-        x = xrange(len(y))
+        x = list(range(len(y)))
         dy = (y - np.mean(y)) * pix
         plt.plot(x, dy, "+", label=str(cuts[i]))
     plt.legend(loc="best")
@@ -1671,10 +1644,10 @@ def knife_edge(filename, direction="horz", cuts=[1, 2, 3], firstim=0, lastim=1, 
     print("knife edge position: ", dy.mean(), "um +/- ", dy.std(), "um")
     plt.close(52)
     plt.figure(52)
-    for i in xrange(len(cuts)):
+    for i in list(range(len(cuts))):
         y = center[i :: len(cuts)]
         # print y
-        x = xrange(len(y))
+        x = list(range(len(y)))
         dy = y
         plt.plot(x, dy, "+", label=str(cuts[i]))
     plt.legend(loc="best")
@@ -1687,9 +1660,9 @@ def knife_edge(filename, direction="horz", cuts=[1, 2, 3], firstim=0, lastim=1, 
 # copied from 99-bluesky....didn't figure out how to import...
 def detselect(detector_object, suffix="_stats1_total"):
     """Switch the active detector and set some internal state"""
-    gs.DETS = [detector_object]
-    gs.PLOT_Y = detector_object.name + suffix
-    gs.TABLE_COLS = [gs.PLOT_Y]
+    gs.DETS = [detector_object]  # noqa: F821
+    gs.PLOT_Y = detector_object.name + suffix  # noqa: F821
+    gs.TABLE_COLS = [gs.PLOT_Y]  # noqa: F821
 
 
 def get_ID_calibration(
@@ -1717,9 +1690,9 @@ def get_ID_calibration(
     from scipy.optimize import curve_fit
 
     ### just testing passing bluesky objects (motors, detectors) into function
-    gs.DETS = [xray_eye1]
+    gs.DETS = [xray_eye1]  # noqa: F821
     # detselect(xray_eye1)
-    dscan(diff.xh, gapstart, gapstop, 3)
+    dscan(diff.xh, gapstart, gapstop, 3)  # noqa: F821
 
     ### end of testing section  #################
 
@@ -1784,19 +1757,17 @@ def get_ID_calibration(
     print("moving DCM Bragg angle to: ", B_guess, " deg and ID gap to ", i, " mm")
     print("hurray, made it up to here!")
     #  ascan(dcm.b,float(B_guess-.4),float(B_guess+.4),60)   # do the Bragg scan
-    header = db[
+    header = db[  # noqa: F821
         -1
     ]  # retrieve the data (first data point is often "wrong", so don't use
-    data = get_table(header)
+    data = get_table(header)  # noqa: F821
     B = data.dcm_b[2:]
     intdat = data.xray_eye1_stats1_total[2:]
     B = np.array(B)
     intdat = np.array(intdat)
     B = np.array(
-        ss[-1].dcm_b
-    )[  # noqa: F821
-        2:
-    ]  # retrieve the data (first data point is often "wrong", so don't use
+        ss[-1].dcm_b  # noqa: F821
+    )[2:]  # retrieve the data (first data point is often "wrong", so don't use
     intdat = np.array(ss[-1].bpm_cam_stats_total1)[2:]  # noqa: F821
     A = np.max(intdat)  # initial parameter guess and fitting
     xc = B[np.argmax(intdat)]
